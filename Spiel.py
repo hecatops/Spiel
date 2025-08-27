@@ -2,13 +2,15 @@ import streamlit as st
 import requests
 import logging
 import re
+import time
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-API_URL = "https://api.mistral.ai/v1/chat/completions"
+API_URL = "https://api.groq.com/openai/v1/chat/completions"
 API_KEY = st.secrets["API_KEY"] 
-MODEL_NAME = "open-mistral-7b"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 headers = {
     "Authorization": f"Bearer {API_KEY}",
@@ -18,7 +20,7 @@ headers = {
 banned_words = [
     "whore", "fuck", "shit", "bitch", "cunt", "dick", "cock", "pussy", "penis", "vagina",
     "asshole", "rape", "molest", "porn", "prostitute", "whorehouse", "orgy", "slut",
-    "masturbate", "fetish", "erotic", "xxx", "nude", "nudity", "incest", "bestiality"
+    "masturbate", "fetish", "erotic", "xxx", "nude", "nudity"
 ]
 
 def is_safe(text):
@@ -28,176 +30,554 @@ def is_safe(text):
             return False
     return True
 
-if "history" not in st.session_state:
-    st.session_state.history = []
-if "player_name" not in st.session_state:
-    st.session_state.player_name = ""
-if "start" not in st.session_state:
-    st.session_state.start = False
+# Initialize session state
+def initialize_session_state():
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    if "player_name" not in st.session_state:
+        st.session_state.player_name = ""
+    if "original_setting" not in st.session_state:
+        st.session_state.original_setting = ""
+    if "start" not in st.session_state:
+        st.session_state.start = False
+    if "choice_count" not in st.session_state:
+        st.session_state.choice_count = 0
+    if "story_phase" not in st.session_state:
+        st.session_state.story_phase = "beginning"
 
-def query_mistral(prompt):
+def query_groq(messages, max_tokens=400):
     body = {
         "model": MODEL_NAME,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "temperature": 0.8,
-        "max_tokens": 300,
+        "max_tokens": max_tokens,
         "stream": False
     }
+    
     try:
-        logger.info("Making API request to Mistral")
+        logger.info("Making API request to Groq")
         response = requests.post(API_URL, headers=headers, json=body)
+        
         if response.status_code != 200:
             logger.error(f"API request failed with status {response.status_code}")
-            return "Trouble in fairyland, come back later!"
+            return "The ancient tomes are temporarily sealed... Please try again."
+        
         data = response.json()
+        
         if "error" in data:
             logger.error(f"API returned error: {data['error']}")
-            return "Trouble in fairyland, come back later!"
+            return "The mystical connection wavers... Please try again."
+        
         if "choices" not in data or len(data["choices"]) == 0:
             logger.error("Unexpected API response structure")
-            return "Trouble in fairyland, come back later!"
+            return "The story threads are tangled... Please try again."
+        
         logger.info("API request successful")
         return data["choices"][0]["message"]["content"].strip()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Network error: {str(e)}")
-        return "Trouble in fairyland, come back later!"
+        
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return "Trouble in fairyland, come back later!"
+        logger.error(f"Error: {str(e)}")
+        return "The magical energies are unstable... Please try again."
 
-def parse_response(response):
-    logger.info("Parsing AI response")
-    response = response.replace("[STORY TEXT HERE]", "").strip()
+def determine_story_phase(choice_count):
+    if choice_count <= 3:
+        return "beginning"
+    elif choice_count <= 7:
+        return "middle"
+    elif choice_count <= 10:
+        return "climax"
+    else:
+        return "ending"
+
+def build_enhanced_system_prompt(original_setting, player_name, story_phase, choice_count):
+    phase_guidance = {
+        "beginning": "Focus on atmospheric world-building and mysterious character introduction.",
+        "middle": "Develop the adventure with increasing mystique and intrigue.",
+        "climax": "Build toward the peak with high stakes and magical tension.",
+        "ending": f"Begin weaving the story's conclusion. Approximately {12 - choice_count} choices remain to complete this tale."
+    }
+    
+    return f"""You are an ancient storyteller, weaving tales of mystery and wonder in the tradition of dark academia.
+
+STORY CONTEXT:
+- Setting: "{original_setting}"
+- Character: {player_name}
+- Phase: {story_phase}
+- Choices made: {choice_count}
+
+GUIDANCE: {phase_guidance[story_phase]}
+
+STYLE:
+- Write in rich, atmospheric prose with scholarly undertones (90-130 words)
+- Embrace themes of ancient knowledge, hidden secrets, and mystical discovery
+- Maintain consistency with setting and previous events
+- Keep content appropriate for all audiences while maintaining sophistication
+- Create meaningful, intellectually intriguing choices
+
+FORMAT:
+Write story segment, then:
+
+CHOICES:
+1. [First choice - often bold or scholarly]
+2. [Second choice - typically cautious or investigative]  
+3. [Third choice - usually creative or intuitive]
+
+Remember: This is a tale worthy of the great libraries, filled with wonder and intellectual adventure."""
+
+def parse_enhanced_response(response):
+    logger.info("Parsing response")
+    
     if "CHOICES:" in response:
         parts = response.split("CHOICES:")
         story_text = parts[0].strip()
         choices_text = parts[1].strip()
         choices = []
+        
         for line in choices_text.split('\n'):
             line = line.strip()
             if line and any(line.startswith(f"{i}.") for i in range(1, 10)):
                 choice = line.split('.', 1)[1].strip()
                 if choice:
                     choices.append(choice)
-        logger.info(f"Parsed {len(choices)} choices from response")
+        
         return story_text, choices
-    else:
-        lines = [line.strip() for line in response.split('\n') if line.strip()]
-        story_lines = []
-        choices = []
-        potential_choices = []
-        story_content = []
-        for i, line in enumerate(lines):
-            if any(line.startswith(prefix) for prefix in ["-", "•", "1.", "2.", "3.", "A.", "B.", "C."]):
-                potential_choices.append(line)
-            elif line.endswith(('.', '!', '?', '"')) and i < len(lines) - 1:
-                story_content.append(line)
-                remaining_lines = lines[i+1:]
-                if all(any(l.startswith(prefix) for prefix in ["-", "•", "1.", "2.", "3.", "A.", "B.", "C."]) for l in remaining_lines if l):
-                    potential_choices.extend(remaining_lines)
+    
+    # Fallback parsing
+    lines = [line.strip() for line in response.split('\n') if line.strip()]
+    story_content = []
+    choices = []
+    
+    choice_patterns = [r'^\d+\.', r'^[ABC]\.', r'^[-•]']
+    
+    for line in lines:
+        is_choice = any(re.match(pattern, line) for pattern in choice_patterns)
+        
+        if is_choice:
+            for pattern in choice_patterns:
+                if re.match(pattern, line):
+                    choice = re.sub(pattern, '', line).strip()
+                    if choice:
+                        choices.append(choice)
                     break
-            else:
-                story_content.append(line)
-        if potential_choices:
-            for choice_line in potential_choices:
-                for prefix in ["-", "•", "1.", "2.", "3.", "A.", "B.", "C."]:
-                    if choice_line.startswith(prefix):
-                        choice = choice_line[len(prefix):].strip()
-                        if choice:
-                            choices.append(choice)
-                        break
-        if choices:
-            story_text = '\n'.join(story_content).strip()
         else:
-            story_text = '\n'.join(lines).strip()
-            choices = ["Open the envelope", "Ignore it and continue", "Look around for the source of the whisper"]
-        logger.info(f"Fallback parsing: {len(choices)} choices extracted")
-        return story_text, choices
+            story_content.append(line)
+    
+    story_text = '\n'.join(story_content).strip()
+    
+    if not choices:
+        choices = [
+            "Consult ancient wisdom and proceed with scholarly confidence",
+            "Exercise caution and gather more mystical knowledge", 
+            "Trust intuition and embrace the unknown path"
+        ]
+    
+    return story_text, choices[:3]
 
-def build_initial_prompt(setting, name):
-    logger.info(f"Building initial prompt for {name} in setting: {setting[:50]}...")
-    return f"""You are Story Master, the narrator of an immersive text adventure game.
-Start a compelling story based on the following setting: "{setting}", involving the player character named {name}.
-Write an engaging story paragraph that sets the scene and presents a situation. Then provide exactly 3 choices.
-End your response with:
-CHOICES:
-1. [First choice]
-2. [Second choice] 
-3. [Third choice]
-Do not include any placeholder text like [STORY TEXT HERE]. Write the actual story content directly.
-Keep your response under 150 words total. No adult or offensive content. Keep it PG-13.
-"""
+def create_dark_academia_ui():
+    st.set_page_config(
+        page_title="✨ Spiel ✨",
+        page_icon="📜",
+        layout="centered",
+        initial_sidebar_state="collapsed"
+    )
+    
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+    
+    .main {
+        background: linear-gradient(-45deg, #1a0d2e, #16213e, #0f3460, #16213e, #1a0d2e);
+        background-size: 400% 400%;
+        animation: gradientShift 15s ease infinite;
+        color: #e8e6e3;
+        font-family: 'Crimson Text', Georgia, serif;
+    }
+    
+    .stApp {
+        background: linear-gradient(-45deg, #1a0d2e, #16213e, #0f3460, #16213e, #1a0d2e);
+        background-size: 400% 400%;
+        animation: gradientShift 15s ease infinite;
+    }
+    
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    /* Input styling */
+    .stTextInput > div > div > input {
+        background-color: rgba(15, 23, 42, 0.8);
+        border: none;
+        border-radius: 8px;
+        color: #e8e6e3;
+        font-size: 16px;
+        padding: 14px 18px;
+        font-family: 'Crimson Text', Georgia, serif;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        background-color: rgba(15, 23, 42, 0.9);
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+        outline: none;
+    }
+    
+    .stTextArea > div > div > textarea {
+        background-color: rgba(15, 23, 42, 0.8);
+        border: none;
+        border-radius: 8px;
+        color: #e8e6e3;
+        font-size: 16px;
+        padding: 14px 18px;
+        font-family: 'Crimson Text', Georgia, serif;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .stTextArea > div > div > textarea:focus {
+        background-color: rgba(15, 23, 42, 0.9);
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+        outline: none;
+    }
+    
+    /* Story display */
+    .story-segment {
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(15px);
+        border-radius: 12px;
+        padding: 28px;
+        margin: 24px 0;
+        line-height: 1.8;
+        font-size: 17px;
+        color: #e8e6e3;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .story-segment:hover {
+        background: rgba(15, 23, 42, 0.5);
+        transform: translateY(-2px);
+    }
+    
+    /* Choice styling */
+    .choice-display {
+        background: rgba(34, 197, 94, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        padding: 12px 18px;
+        margin: 12px 0;
+        font-size: 15px;
+        color: #22c55e;
+        font-style: italic;
+        border-left: 3px solid #22c55e;
+    }
+    
+    /* Button styling - enhanced for all buttons including form submit */
+    .stButton > button {
+        background: rgba(15, 23, 42, 0.6);
+        color: #e8e6e3;
+        border: none;
+        border-radius: 8px;
+        padding: 14px 24px;
+        font-size: 15px;
+        font-weight: 400;
+        font-family: 'Crimson Text', Georgia, serif;
+        width: 100%;
+        backdrop-filter: blur(15px);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .stButton > button:hover {
+        background: rgba(34, 197, 94, 0.2);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+    }
+    
+    /* Form submit button styling */
+    .stFormSubmitButton > button {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 14px 24px !important;
+        font-family: 'Crimson Text', Georgia, serif !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3) !important;
+    }
+    
+    .stFormSubmitButton > button:hover {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(34, 197, 94, 0.5) !important;
+    }
+    
+    /* Hide streamlit elements */
+    .stDeployButton, #MainMenu, header {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* Typography */
+    h1, h2, h3 {
+        color: #e8e6e3;
+        font-family: 'Crimson Text', Georgia, serif;
+        font-weight: 600;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+    
+    .subtitle {
+        color: #a1a1aa;
+        font-size: 24px;
+        font-weight: 400;
+        margin-bottom: 2.5rem;
+        text-align: center;
+        font-family: 'Crimson Text', Georgia, serif;
+    }
+    
+    /* Mystical glow effects */
+    .mystical-title {
+        background: linear-gradient(45deg, #e8e6e3, #22c55e, #e8e6e3);
+        background-size: 200% 200%;
+        animation: titleGlow 3s ease-in-out infinite;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    @keyframes titleGlow {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(15, 23, 42, 0.3);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: rgba(34, 197, 94, 0.6);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(34, 197, 94, 0.8);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-def build_choice_prompt(choice):
-    logger.info(f"Building choice prompt for: {choice}")
-    return f"""Continue the interactive text adventure game. The player chose: "{choice}".
-Write what happens next in the story, then provide exactly 3 new choices for what to do next.
-End your response with:
-CHOICES:
-1. [First choice]
-2. [Second choice]
-3. [Third choice]
-Do not include any placeholder text. Keep it PG-13. No adult or offensive content.
-If the adventure has reached 12 or more player choices, narrate a satisfying ending instead of offering choices.
-Keep your response under 100 words total.
-"""
-
-st.set_page_config(page_title="Spiel", layout="centered")
-
-st.markdown("""<h1 style='color: #D94B4B; font-size: 6rem; font-weight: bold;'>Spiel</h1>""", unsafe_allow_html=True)
-
-if not st.session_state.start:
-    with st.form("intro"):
-        name = st.text_input("What should the player be called?", "")
-        setting = st.text_area("Describe the setting to begin your adventure", "")
-        submitted = st.form_submit_button("Start the Adventure")
-        if submitted:
-            if not name or not setting:
-                st.error("Name and setting required.")
-            elif not is_safe(name) or not is_safe(setting):
-                st.error("Please keep it appropriate and PG-13.")
-            else:
-                logger.info(f"Starting new adventure for {name}")
-                st.session_state.player_name = name
-                st.session_state.start = True
-                initial_prompt = build_initial_prompt(setting, name)
-                response = query_mistral(initial_prompt)
-                if response == "Trouble in fairyland, come back later!":
-                    st.error(response)
-                    st.session_state.start = False
-                elif not is_safe(response):
-                    st.error("Story contained inappropriate content. Try a different setting.")
-                    st.session_state.start = False
+def main():
+    initialize_session_state()
+    create_dark_academia_ui()
+    
+    if not st.session_state.start:
+        # Elegant mystical intro
+        st.markdown("""
+        <div style='text-align: center; margin-bottom: 3rem;'>
+            <h1 class='mystical-title' style='font-size: 3.5rem; margin-bottom: 0.5rem; letter-spacing: -0.02em;'>
+                ✨ Spiel ✨
+            </h1>
+            <div class='subtitle'>
+                Weave your own tale of mystery and wonder... Who are you and what fate awaits? You tell us.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("mystical_intro", clear_on_submit=False):
+            name = st.text_input(
+                "Character Name",
+                placeholder="Your name",
+                label_visibility="collapsed"
+            )
+            
+            st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+            
+            setting = st.text_area(
+                "Adventure Setting", 
+                placeholder="Describe the mystical realm where your tale unfolds...",
+                height=90,
+                label_visibility="collapsed"
+            )
+            
+            st.markdown("<div style='height: 32px;'></div>", unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns([1.5, 1, 1.5])
+            with col2:
+                submitted = st.form_submit_button(
+                    "✨ Begin ✨",
+                    use_container_width=True
+                )
+            
+            if submitted:
+                if not name or not setting:
+                    st.error("🔮 The ancient forces require both a name and setting to weave your tale...")
+                elif not is_safe(name) or not is_safe(setting):
+                    st.error("📜 Please keep your chronicle appropriate for all who seek knowledge...")
                 else:
-                    story_text, choices = parse_response(response)
-                    st.session_state.history.append({"npc": story_text, "choices": choices})
-                    st.rerun()
-else:
-    for i, entry in enumerate(st.session_state.history):
-        st.markdown(f"**Story Master:** {entry['npc']}")
-        if i > 0 and "choice" in entry:
-            st.markdown(f"""<div style='background-color: #D94B4B; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #D94B4B;'>🎮 <strong>You chose:</strong> <em>{entry['choice']}</em></div>""", unsafe_allow_html=True)
-    if st.session_state.history:
-        if len(st.session_state.history) >= 13:
-            st.markdown("The adventure has come to its conclusion. Restart to begin a new journey.")
-        else:
-            current_entry = st.session_state.history[-1]
-            choices = current_entry.get("choices", ["Look around", "Continue forward", "Ask for help"])
-            st.markdown("#### What will you do?")
-            for choice in choices:
-                if st.button(choice, key=f"choice_{len(st.session_state.history)}_{choice}"):
-                    logger.info(f"Player chose: {choice}")
-                    prompt = build_choice_prompt(choice)
-                    response = query_mistral(prompt)
-                    if response == "Trouble in fairyland, come back later!":
-                        st.error(response)
-                    elif not is_safe(response):
-                        st.error("Story contained inappropriate content. Try a different choice.")
-                    else:
-                        story_text, new_choices = parse_response(response)
-                        st.session_state.history.append({"choice": choice, "npc": story_text, "choices": new_choices})
+                    with st.spinner("🌟 Consulting the ancient texts..."):
+                        time.sleep(1.8)
+                        
+                    st.session_state.player_name = name
+                    st.session_state.original_setting = setting
+                    st.session_state.start = True
+                    st.session_state.choice_count = 0
+                    st.session_state.story_phase = "beginning"
+                    
+                    system_prompt = build_enhanced_system_prompt(
+                        setting, name, "beginning", 0
+                    )
+                    
+                    initial_messages = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Begin the mystical chronicle for {name} in: {setting}"}
+                    ]
+                    
+                    response = query_groq(initial_messages)
+                    
+                    if not any(phrase in response for phrase in ["ancient tomes", "mystical connection", "story threads"]) and is_safe(response):
+                        story_text, choices = parse_enhanced_response(response)
+                        st.session_state.history.append({
+                            "story": story_text,
+                            "choices": choices,
+                            "timestamp": datetime.now()
+                        })
+                        st.success("✨ Your chronicle begins! The threads of destiny are now woven...")
+                        time.sleep(1.5)
                         st.rerun()
-    if st.button("Restart"):
-        logger.info("Restarting game")
-        st.session_state.clear()
-        st.rerun()
+                    else:
+                        st.error("📚 The ancient texts are momentarily unclear. Please try again...")
+                        st.session_state.start = False
+    
+    else:
+        st.markdown(f"""
+        <div style='text-align: center; margin-bottom: 35px; padding-bottom: 25px; 
+                    border-bottom: 1px solid rgba(34, 197, 94, 0.2);'>
+            <h2 style='color: #e8e6e3; font-weight: 400; margin: 0; font-size: 1.8rem;'>
+                {st.session_state.player_name}
+            </h2>
+            <div style='color: #22c55e; font-size: 14px; margin-top: 8px; font-style: italic;'>
+                ✦ Chronicle {st.session_state.choice_count + 1} ✦
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        for i, entry in enumerate(st.session_state.history):
+            st.markdown(f"""
+            <div class='story-segment'>
+                {entry['story']}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if i > 0 and "chosen_option" in entry:
+                st.markdown(f"""
+                <div class='choice-display'>
+                    ✦ {entry['chosen_option']}
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Current choices or ending
+        if st.session_state.history:
+            current_entry = st.session_state.history[-1]
+            
+            if st.session_state.choice_count >= 12:
+                st.markdown("""
+                <div style='text-align: center; margin: 50px 0; padding: 40px; 
+                            background: rgba(15, 23, 42, 0.6); border-radius: 15px;
+                            backdrop-filter: blur(20px); border: 1px solid rgba(34, 197, 94, 0.2);'>
+                    <h3 style='color: #22c55e; margin-bottom: 20px; font-size: 1.6rem;'>
+                        ✨ Chronicle Complete ✨
+                    </h3>
+                    <div style='color: #a1a1aa; font-style: italic; font-size: 16px;'>
+                        Your mystical tale has been inscribed in the eternal archives...
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Balloons only at the very end like you wanted
+                st.balloons()
+                
+                col1, col2, col3 = st.columns([1.5, 1, 1.5])
+                with col2:
+                    if st.button("📜 New Chronicle", use_container_width=True, key="new_chronicle"):
+                        for key in list(st.session_state.keys()):
+                            del st.session_state[key]
+                        st.rerun()
+                        
+            else:
+                choices = current_entry.get("choices", [])
+                if choices:
+                    st.markdown("""
+                    <div style='text-align: center; margin: 25px 0; color: #a1a1aa; font-style: italic;'>
+                    ✦ What path shall destiny weave? ✦
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    for j, choice in enumerate(choices):
+                        if st.button(f"✦ {choice}", key=f"choice_{len(st.session_state.history)}_{j}"):
+                            st.session_state.choice_count += 1
+                            st.session_state.story_phase = determine_story_phase(st.session_state.choice_count)
+                            
+                            with st.spinner("✨ The mystical forces respond..."):
+                                time.sleep(1.2)
+                            
+                            # Build conversation for context
+                            conversation_history = [
+                                {"role": "system", "content": build_enhanced_system_prompt(
+                                    st.session_state.original_setting,
+                                    st.session_state.player_name,
+                                    st.session_state.story_phase,
+                                    st.session_state.choice_count
+                                )}
+                            ]
+                            
+                            # Add recent context
+                            for entry in st.session_state.history[-3:]:
+                                conversation_history.append({
+                                    "role": "assistant",
+                                    "content": f"Story: {entry['story']}\nChoices: {', '.join(entry.get('choices', []))}"
+                                })
+                                if "chosen_option" in entry:
+                                    conversation_history.append({
+                                        "role": "user",
+                                        "content": f"Chose: {entry['chosen_option']}"
+                                    })
+                            
+                            conversation_history.append({
+                                "role": "user",
+                                "content": f"Chose: {choice}"
+                            })
+                            
+                            response = query_groq(conversation_history)
+                            
+                            if not any(phrase in response for phrase in ["ancient tomes", "mystical connection", "story threads"]) and is_safe(response):
+                                story_text, new_choices = parse_enhanced_response(response)
+                                
+                                st.session_state.history.append({
+                                    "story": story_text,
+                                    "choices": new_choices,
+                                    "chosen_option": choice,
+                                    "timestamp": datetime.now()
+                                })
+                                
+                                st.rerun()
+                            else:
+                                st.error("🔮 The mystical energies waver... Please try again.")
+        
+        # Subtle restart option
+        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([2.5, 1, 2.5])
+        with col2:
+            if st.button("Restart", use_container_width=True, key="restart_chronicle"):
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                st.rerun()
+
+if __name__ == "__main__":
+    main()
