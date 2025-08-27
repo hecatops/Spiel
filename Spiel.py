@@ -130,27 +130,78 @@ IMPORTANT:
 - Otherwise ALWAYS provide exactly 3 distinct choices in the above format.
 """
 
+
 def parse_enhanced_response(response):
     logger.info("Parsing response")
     
+    if not response:
+        return "", get_default_choices()
+    
+    # Method 1: Split by CHOICES: if present
     if "CHOICES:" in response:
-        parts = response.split("CHOICES:")
+        parts = response.split("CHOICES:", 1)  # Only split on first occurrence
         story_text = parts[0].strip()
         choices_text = parts[1].strip()
-        
-        choices = []
-        for line in choices_text.split("\n"):
-            line = line.strip()
-            if re.match(r"^\d+\.", line):
-                choice = line.split(".", 1)[1].strip()
-                if choice:
-                    choices.append(choice)
-        
-        return story_text, choices[:3]
+        choices = extract_choices(choices_text)
+        return story_text, choices
     
-    story_text = response.strip()
-    return story_text, []
+    # Method 2: Find choices at the end
+    lines = response.strip().split('\n')
+    story_lines = []
+    choice_lines = []
+    
+    # Look for where choices start (consecutive numbered/bulleted lines)
+    choice_started = False
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if this line looks like a choice
+        is_choice = bool(re.match(r'^\d+\.|\^[ABC]\.|\^[-•]', line))
+        
+        if is_choice and not choice_started:
+            choice_started = True
+            
+        if choice_started:
+            choice_lines.append(line)
+        else:
+            story_lines.append(line)
+    
+    story_text = '\n'.join(story_lines).strip()
+    choices = extract_choices('\n'.join(choice_lines)) if choice_lines else []
+    
+    # Fallback if no story found
+    if not story_text:
+        story_text = response
+    
+    # Fallback if no choices found  
+    if not choices:
+        choices = get_default_choices()
+    
+    return story_text, choices[:3]
 
+def extract_choices(text):
+    """Extract clean choice text from formatted lines"""
+    choices = []
+    for line in text.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Remove common prefixes
+        cleaned = re.sub(r'^\d+\.\s*|^[ABC]\.\s*|^[-•]\s*', '', line)
+        if cleaned:
+            choices.append(cleaned)
+    
+    return choices
+
+def get_default_choices():
+    return [
+        "Consult ancient wisdom and proceed with scholarly confidence",
+        "Exercise caution and gather more mystical knowledge", 
+        "Trust intuition and embrace the unknown path"
+    ]
 
 def create_dark_academia_ui():
     st.set_page_config(
@@ -559,5 +610,4 @@ def main():
                 st.rerun()
 
 if __name__ == "__main__":
-
     main()
