@@ -94,10 +94,12 @@ def build_enhanced_system_prompt(original_setting, player_name, story_phase, cho
         "beginning": "Focus on atmospheric world-building and mysterious character introduction.",
         "middle": "Develop the adventure with increasing mystique and intrigue.",
         "climax": "Build toward the peak with high stakes and magical tension.",
-        "ending": f"Begin weaving the story's conclusion. Approximately {12 - choice_count} choices remain to complete this tale."
+        "ending": f"Conclude the tale. If {choice_count} < 11, provide 3 choices that clearly guide toward closure. "
+                  f"If {choice_count} >= 11, end the story fully with NO choices."
     }
     
-    return f"""You are an ancient storyteller, weaving tales of mystery and wonder in the tradition of dark academia.
+    return f"""
+You are an ancient storyteller, weaving tales of mystery and wonder in the tradition of dark academia.
 
 STORY CONTEXT:
 - Setting: "{original_setting}"
@@ -108,21 +110,25 @@ STORY CONTEXT:
 GUIDANCE: {phase_guidance[story_phase]}
 
 STYLE:
-- Write in rich, atmospheric prose with scholarly undertones (90-130 words)
-- Embrace themes of ancient knowledge, hidden secrets, and mystical discovery
-- Maintain consistency with setting and previous events
-- Keep content appropriate for all audiences while maintaining sophistication
-- Create meaningful, intellectually intriguing choices
+- Write in rich, atmospheric prose with scholarly undertones (90–130 words).
+- Embrace themes of ancient knowledge, hidden secrets, and mystical discovery.
+- Keep content appropriate for all audiences while maintaining sophistication.
+- Maintain consistency with setting and previous events.
 
-FORMAT:
-Write story segment, then:
+FORMAT (MANDATORY):
+Always write in this exact format:
+
+[Story text, 90–130 words]
 
 CHOICES:
-1. [First choice - often bold or scholarly]
-2. [Second choice - typically cautious or investigative]  
-3. [Third choice - usually creative or intuitive]
+1. [Choice one – bold or scholarly]
+2. [Choice two – cautious or investigative]
+3. [Choice three – creative or intuitive]
 
-Remember: This is a tale worthy of the great libraries, filled with wonder and intellectual adventure."""
+IMPORTANT:
+- If the story is ending (choice_count >= 11), do NOT output 'CHOICES:' at all. Only conclude the story.
+- Otherwise ALWAYS provide exactly 3 distinct choices in the above format.
+"""
 
 def parse_enhanced_response(response):
     logger.info("Parsing response")
@@ -131,47 +137,20 @@ def parse_enhanced_response(response):
         parts = response.split("CHOICES:")
         story_text = parts[0].strip()
         choices_text = parts[1].strip()
-        choices = []
         
-        for line in choices_text.split('\n'):
+        choices = []
+        for line in choices_text.split("\n"):
             line = line.strip()
-            if line and any(line.startswith(f"{i}.") for i in range(1, 10)):
-                choice = line.split('.', 1)[1].strip()
+            if re.match(r"^\d+\.", line):
+                choice = line.split(".", 1)[1].strip()
                 if choice:
                     choices.append(choice)
         
-        return story_text, choices
+        return story_text, choices[:3]
     
-    # Fallback parsing
-    lines = [line.strip() for line in response.split('\n') if line.strip()]
-    story_content = []
-    choices = []
-    
-    choice_patterns = [r'^\d+\.', r'^[ABC]\.', r'^[-•]']
-    
-    for line in lines:
-        is_choice = any(re.match(pattern, line) for pattern in choice_patterns)
-        
-        if is_choice:
-            for pattern in choice_patterns:
-                if re.match(pattern, line):
-                    choice = re.sub(pattern, '', line).strip()
-                    if choice:
-                        choices.append(choice)
-                    break
-        else:
-            story_content.append(line)
-    
-    story_text = '\n'.join(story_content).strip()
-    
-    if not choices:
-        choices = [
-            "Consult ancient wisdom and proceed with scholarly confidence",
-            "Exercise caution and gather more mystical knowledge", 
-            "Trust intuition and embrace the unknown path"
-        ]
-    
-    return story_text, choices[:3]
+    story_text = response.strip()
+    return story_text, []
+
 
 def create_dark_academia_ui():
     st.set_page_config(
@@ -580,4 +559,5 @@ def main():
                 st.rerun()
 
 if __name__ == "__main__":
+
     main()
