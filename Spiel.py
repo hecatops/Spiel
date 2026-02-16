@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
-API_KEY = st.secrets["API_KEY"] 
+API_KEY = "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"
 MODEL_NAME = "llama-3.3-70b-versatile"
 
 headers = {
@@ -205,7 +205,7 @@ def get_default_choices():
 
 def create_dark_academia_ui():
     st.set_page_config(
-        page_title="✨ Spiel ✨",
+        page_title="Spiel",
         page_icon="📜",
         layout="centered",
         initial_sidebar_state="collapsed"
@@ -216,134 +216,109 @@ def create_dark_academia_ui():
     @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
     
     .main {
-        background: linear-gradient(-45deg, #1a0d2e, #16213e, #0f3460, #16213e, #1a0d2e);
-        background-size: 400% 400%;
-        animation: gradientShift 15s ease infinite;
+        background: #0a0a0a;
         color: #e8e6e3;
         font-family: 'Crimson Text', Georgia, serif;
     }
     
     .stApp {
-        background: linear-gradient(-45deg, #1a0d2e, #16213e, #0f3460, #16213e, #1a0d2e);
-        background-size: 400% 400%;
-        animation: gradientShift 15s ease infinite;
-    }
-    
-    @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+        background: #0a0a0a;
     }
     
     /* Input styling */
     .stTextInput > div > div > input {
-        background-color: rgba(15, 23, 42, 0.8);
-        border: none;
+        background-color: #1a1a1a;
+        border: 1px solid #3d2b5c;
         border-radius: 8px;
         color: #e8e6e3;
         font-size: 16px;
         padding: 14px 18px;
         font-family: 'Crimson Text', Georgia, serif;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
     }
     
     .stTextInput > div > div > input:focus {
-        background-color: rgba(15, 23, 42, 0.9);
-        box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+        background-color: #1a1a1a;
+        border: 1px solid #7c3aed;
+        box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
         outline: none;
     }
     
     .stTextArea > div > div > textarea {
-        background-color: rgba(15, 23, 42, 0.8);
-        border: none;
+        background-color: #1a1a1a;
+        border: 1px solid #3d2b5c;
         border-radius: 8px;
         color: #e8e6e3;
         font-size: 16px;
         padding: 14px 18px;
         font-family: 'Crimson Text', Georgia, serif;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
     }
     
     .stTextArea > div > div > textarea:focus {
-        background-color: rgba(15, 23, 42, 0.9);
-        box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+        background-color: #1a1a1a;
+        border: 1px solid #7c3aed;
+        box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
         outline: none;
     }
     
     /* Story display */
     .story-segment {
-        background: rgba(15, 23, 42, 0.4);
-        backdrop-filter: blur(15px);
+        background: #1a1a1a;
+        border: 1px solid #2d2d2d;
         border-radius: 12px;
         padding: 28px;
         margin: 24px 0;
         line-height: 1.8;
         font-size: 17px;
         color: #e8e6e3;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        transition: all 0.3s ease;
-    }
-    
-    .story-segment:hover {
-        background: rgba(15, 23, 42, 0.5);
-        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
     }
     
     /* Choice styling */
     .choice-display {
-        background: rgba(34, 197, 94, 0.1);
-        backdrop-filter: blur(10px);
+        background: rgba(124, 58, 237, 0.1);
         border-radius: 8px;
         padding: 12px 18px;
         margin: 12px 0;
         font-size: 15px;
-        color: #22c55e;
+        color: #a78bfa;
         font-style: italic;
-        border-left: 3px solid #22c55e;
+        border-left: 3px solid #7c3aed;
     }
     
     /* Button styling - enhanced for all buttons including form submit */
     .stButton > button {
-        background: rgba(15, 23, 42, 0.6);
+        background: #1a1a1a;
         color: #e8e6e3;
-        border: none;
+        border: 1px solid #3d2b5c;
         border-radius: 8px;
         padding: 14px 24px;
         font-size: 15px;
         font-weight: 400;
         font-family: 'Crimson Text', Georgia, serif;
         width: 100%;
-        backdrop-filter: blur(15px);
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     
     .stButton > button:hover {
-        background: rgba(34, 197, 94, 0.2);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(34, 197, 94, 0.2);
-        color: #22c55e;
+        background: #2d2d2d;
+        border: 1px solid #7c3aed;
+        color: #a78bfa;
     }
     
     /* Form submit button styling */
     .stFormSubmitButton > button {
-        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
-        color: #0f172a !important;
+        background: #7c3aed !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
         border: none !important;
         border-radius: 8px !important;
         padding: 14px 24px !important;
         font-family: 'Crimson Text', Georgia, serif !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4) !important;
     }
     
     .stFormSubmitButton > button:hover {
-        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 25px rgba(34, 197, 94, 0.5) !important;
+        background: #6d28d9 !important;
     }
     
     /* Hide streamlit elements */
@@ -357,7 +332,6 @@ def create_dark_academia_ui():
         color: #e8e6e3;
         font-family: 'Crimson Text', Georgia, serif;
         font-weight: 600;
-        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     }
     
     .subtitle {
@@ -369,19 +343,9 @@ def create_dark_academia_ui():
         font-family: 'Crimson Text', Georgia, serif;
     }
     
-    /* Mystical glow effects */
+    /* Title styling */
     .mystical-title {
-        background: linear-gradient(45deg, #e8e6e3, #22c55e, #e8e6e3);
-        background-size: 200% 200%;
-        animation: titleGlow 3s ease-in-out infinite;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    
-    @keyframes titleGlow {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
+        color: #a78bfa;
     }
     
     /* Scrollbar */
@@ -390,16 +354,16 @@ def create_dark_academia_ui():
     }
     
     ::-webkit-scrollbar-track {
-        background: rgba(15, 23, 42, 0.3);
+        background: #1a1a1a;
     }
     
     ::-webkit-scrollbar-thumb {
-        background: rgba(34, 197, 94, 0.6);
+        background: #3d2b5c;
         border-radius: 4px;
     }
     
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(34, 197, 94, 0.8);
+        background: #7c3aed;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -413,7 +377,7 @@ def main():
         st.markdown("""
         <div style='text-align: center; margin-bottom: 3rem;'>
             <h1 class='mystical-title' style='font-size: 3.5rem; margin-bottom: 0.5rem; letter-spacing: -0.02em;'>
-                ✨ Spiel ✨
+                Spiel
             </h1>
             <div class='subtitle'>
                 Weave your own tale of mystery and wonder... Who are you and what fate awaits? You tell us.
@@ -441,17 +405,17 @@ def main():
             col1, col2, col3 = st.columns([1.5, 1, 1.5])
             with col2:
                 submitted = st.form_submit_button(
-                    "✨ Begin ✨",
+                    "Begin",
                     use_container_width=True
                 )
             
             if submitted:
                 if not name or not setting:
-                    st.error("🔮 The ancient forces require both a name and setting to weave your tale...")
+                    st.error("The ancient forces require both a name and setting to weave your tale...")
                 elif not is_safe(name) or not is_safe(setting):
-                    st.error("📜 Please keep your chronicle appropriate for all who seek knowledge...")
+                    st.error("Please keep your chronicle appropriate for all who seek knowledge...")
                 else:
-                    with st.spinner("🌟 Consulting the ancient texts..."):
+                    with st.spinner("Consulting the ancient texts..."):
                         time.sleep(1.8)
                         
                     st.session_state.player_name = name
@@ -478,22 +442,22 @@ def main():
                             "choices": choices,
                             "timestamp": datetime.now()
                         })
-                        st.success("✨ Your chronicle begins! The threads of destiny are now woven...")
+                        st.success("Your chronicle begins! The threads of destiny are now woven...")
                         time.sleep(1.5)
                         st.rerun()
                     else:
-                        st.error("📚 The ancient texts are momentarily unclear. Please try again...")
+                        st.error("The ancient texts are momentarily unclear. Please try again...")
                         st.session_state.start = False
     
     else:
         st.markdown(f"""
         <div style='text-align: center; margin-bottom: 35px; padding-bottom: 25px; 
-                    border-bottom: 1px solid rgba(34, 197, 94, 0.2);'>
+                    border-bottom: 1px solid rgba(124, 58, 237, 0.2);'>
             <h2 style='color: #e8e6e3; font-weight: 400; margin: 0; font-size: 1.8rem;'>
                 {st.session_state.player_name}
             </h2>
-            <div style='color: #22c55e; font-size: 14px; margin-top: 8px; font-style: italic;'>
-                ✦ Chronicle {st.session_state.choice_count + 1} ✦
+            <div style='color: #a78bfa; font-size: 14px; margin-top: 8px; font-style: italic;'>
+                Chronicle {st.session_state.choice_count + 1}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -508,7 +472,7 @@ def main():
             if i > 0 and "chosen_option" in entry:
                 st.markdown(f"""
                 <div class='choice-display'>
-                    ✦ {entry['chosen_option']}
+                    {entry['chosen_option']}
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -519,10 +483,10 @@ def main():
             if st.session_state.choice_count >= 12:
                 st.markdown("""
                 <div style='text-align: center; margin: 50px 0; padding: 40px; 
-                            background: rgba(15, 23, 42, 0.6); border-radius: 15px;
-                            backdrop-filter: blur(20px); border: 1px solid rgba(34, 197, 94, 0.2);'>
-                    <h3 style='color: #22c55e; margin-bottom: 20px; font-size: 1.6rem;'>
-                        ✨ Chronicle Complete ✨
+                            background: #1a1a1a; border-radius: 15px;
+                            border: 1px solid rgba(124, 58, 237, 0.3);'>
+                    <h3 style='color: #a78bfa; margin-bottom: 20px; font-size: 1.6rem;'>
+                        Chronicle Complete
                     </h3>
                     <div style='color: #a1a1aa; font-style: italic; font-size: 16px;'>
                         Your mystical tale has been inscribed in the eternal archives...
@@ -535,7 +499,7 @@ def main():
                 
                 col1, col2, col3 = st.columns([1.5, 1, 1.5])
                 with col2:
-                    if st.button("📜 New Chronicle", use_container_width=True, key="new_chronicle"):
+                    if st.button("New Chronicle", use_container_width=True, key="new_chronicle"):
                         for key in list(st.session_state.keys()):
                             del st.session_state[key]
                         st.rerun()
@@ -545,16 +509,16 @@ def main():
                 if choices:
                     st.markdown("""
                     <div style='text-align: center; margin: 25px 0; color: #a1a1aa; font-style: italic;'>
-                    ✦ What path shall destiny weave? ✦
+                    What path shall destiny weave?
                     </div>
                     """, unsafe_allow_html=True)
                     
                     for j, choice in enumerate(choices):
-                        if st.button(f"✦ {choice}", key=f"choice_{len(st.session_state.history)}_{j}"):
+                        if st.button(f"{choice}", key=f"choice_{len(st.session_state.history)}_{j}"):
                             st.session_state.choice_count += 1
                             st.session_state.story_phase = determine_story_phase(st.session_state.choice_count)
                             
-                            with st.spinner("✨ The mystical forces respond..."):
+                            with st.spinner("The mystical forces respond..."):
                                 time.sleep(1.2)
                             
                             # Build conversation for context
@@ -598,7 +562,7 @@ def main():
                                 
                                 st.rerun()
                             else:
-                                st.error("🔮 The mystical energies waver... Please try again.")
+                                st.error("The mystical energies waver... Please try again.")
         
         # Subtle restart option
         st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
