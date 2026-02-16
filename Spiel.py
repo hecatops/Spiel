@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
-API_KEY = "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"
+API_KEY = st.secrets["API_KEY"] 
 MODEL_NAME = "llama-3.3-70b-versatile"
 
 headers = {
